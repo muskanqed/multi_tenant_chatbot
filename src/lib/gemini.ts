@@ -1,17 +1,17 @@
 // ============================================
 // lib/gemini.ts - Gemini AI Integration
 // ============================================
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function streamGeminiResponse(
   prompt: string,
   systemInstruction: string,
-  modelName: string = 'gemini-1.5-flash'
+  modelName: string = "gemini-2.5-pro"
 ) {
   const model = genAI.getGenerativeModel({
-    model: modelName,
+    model: "gemini-2.5-pro",
     systemInstruction,
   });
 
@@ -23,7 +23,7 @@ export async function streamGeminiResponse(
 export async function getGeminiResponse(
   prompt: string,
   systemInstruction: string,
-  modelName: string = 'gemini-1.5-flash'
+  modelName: string = "gemini-2.0-flash-exp"
 ) {
   const model = genAI.getGenerativeModel({
     model: modelName,

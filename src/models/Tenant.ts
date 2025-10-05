@@ -49,7 +49,7 @@ const TenantSchema = new Schema<ITenant>(
     model: {
       type: String,
       required: true,
-      default: "gemini-1.5-flash",
+      default: "gemini-2.0-flash-exp",
     },
   },
   {
