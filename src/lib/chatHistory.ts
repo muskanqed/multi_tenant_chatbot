@@ -6,11 +6,10 @@ import ChatHistory, { IChatHistory } from '@/models/ChatHistory';
 import ChatSession from '@/models/ChatSession';
 
 export async function saveChatMessage(
-  tenantId: string,
+  userId: string,
   sessionId: string,
   role: 'user' | 'assistant',
   content: string,
-  userId?: string,
   tokens?: {
     promptTokens: number;
     responseTokens: number;
@@ -31,7 +30,7 @@ export async function saveChatMessage(
   }
 
   const chat = await ChatHistory.findOneAndUpdate(
-    { tenantId, sessionId },
+    { userId, sessionId },
     {
       $push: {
         messages: messageData,
@@ -42,7 +41,7 @@ export async function saveChatMessage(
 
   // Update or create session metadata
   if (role === 'user') {
-    await upsertChatSession(tenantId, sessionId, content, userId);
+    await upsertChatSession(userId, sessionId, content);
   } else {
     // Just update the lastMessageAt for assistant messages
     await ChatSession.findOneAndUpdate(
@@ -58,10 +57,9 @@ export async function saveChatMessage(
  * Create or update a chat session
  */
 export async function upsertChatSession(
-  tenantId: string,
+  userId: string,
   sessionId: string,
-  lastMessage: string,
-  userId?: string
+  lastMessage: string
 ) {
   await connectDB();
 
@@ -76,7 +74,6 @@ export async function upsertChatSession(
     const title = lastMessage.slice(0, 50) + (lastMessage.length > 50 ? "..." : "");
     await ChatSession.create({
       sessionId,
-      tenantId,
       userId,
       title,
       lastMessageAt: new Date(),
@@ -85,35 +82,27 @@ export async function upsertChatSession(
 }
 
 export async function getChatHistory(
-  tenantId: string,
+  userId: string,
   sessionId: string
 ): Promise<IChatHistory | null> {
   await connectDB();
-  const chat = await ChatHistory.findOne({ tenantId, sessionId }).lean();
+  const chat = await ChatHistory.findOne({ userId, sessionId }).lean();
   return chat as IChatHistory | null;
 }
 
-export async function getAllChatsForTenant(tenantId: string) {
+export async function getAllChatsForUser(userId: string) {
   await connectDB();
-  const chats = await ChatHistory.find({ tenantId })
+  const chats = await ChatHistory.find({ userId })
     .sort({ updatedAt: -1 })
     .limit(100)
     .lean();
   return chats;
 }
 
-export async function getUserChatSessions(
-  tenantId: string,
-  userId?: string
-) {
+export async function getUserChatSessions(userId: string) {
   await connectDB();
 
-  const query: any = { tenantId };
-  if (userId) {
-    query.userId = userId;
-  }
-
-  const sessions = await ChatSession.find(query)
+  const sessions = await ChatSession.find({ userId })
     .sort({ lastMessageAt: -1 })
     .limit(50)
     .lean();

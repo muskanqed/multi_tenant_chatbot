@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { connectDB } from '@/lib/mongoose';
 import User from '@/models/User';
+import Tenant from '@/models/Tenant';
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, tenantId, role } = await req.json();
+    const { name, email, password, tenantId } = await req.json();
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !tenantId) {
       return NextResponse.json(
-        { error: 'Name, email, and password are required' },
+        { error: 'Name, email, password, and tenantId are required' },
         { status: 400 }
       );
     }
@@ -24,11 +25,20 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // Verify tenant exists
+    const tenant = await Tenant.findOne({ tenantId });
+    if (!tenant) {
+      return NextResponse.json(
+        { error: 'Invalid tenant ID' },
+        { status: 404 }
+      );
+    }
+
+    // Check if user already exists with this email in this tenant
+    const existingUser = await User.findOne({ email, tenantId });
     if (existingUser) {
       return NextResponse.json(
-        { error: 'User with this email already exists' },
+        { error: 'User with this email already exists in this tenant' },
         { status: 409 }
       );
     }
@@ -36,13 +46,12 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user (all users in DB are tenant users/clients)
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
-      role: role || 'user',
-      tenantId: tenantId || undefined,
+      tenantId,
     });
 
     // Return user without password
@@ -53,7 +62,6 @@ export async function POST(req: NextRequest) {
           id: user._id,
           name: user.name,
           email: user.email,
-          role: user.role,
           tenantId: user.tenantId,
         },
       },

@@ -25,12 +25,19 @@ npm run format         # Format code with Biome
 
 ### Multi-Tenancy System
 
-The application isolates data and branding per tenant using a `tenantId` field:
+The application uses a three-tier architecture:
 
-- **Tenant Model** (`src/models/Tenant.ts`): Stores tenant configuration including name, logo, theme colors, AI persona, and Gemini model selection
+1. **Admin** (single, env-based): One admin user configured via `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables. Does not require database access.
+2. **Tenants** (multiple organizations): Each tenant represents a company/organization with isolated branding and configuration.
+3. **Users/Clients** (per tenant): Each tenant has multiple users/clients who interact with the chatbot.
+
+**Database Models:**
+
+- **Tenant Model** (`src/models/Tenant.ts`): Stores tenant configuration including name, unique domain (for whitelabeling), logo, theme colors, AI persona, and Gemini model selection
 - **Tenant Config** (`src/lib/tenantConfig.ts`): CRUD operations for tenant management
-- **User Model** (`src/models/User.ts`): Associates users with tenants via optional `tenantId` field
-- **Chat History** (`src/models/ChatHistory.ts`): Stores conversations per tenant/session pair
+- **User Model** (`src/models/User.ts`): All users belong to a tenant (required `tenantId` field). Email uniqueness is scoped per tenant using compound index `{email, tenantId}`.
+- **Chat History** (`src/models/ChatHistory.ts`): Stores conversations per user (userId + sessionId composite key)
+- **Chat Session** (`src/models/ChatSession.ts`): Stores session metadata per user for sidebar display
 
 ### Database Layer
 
@@ -49,11 +56,15 @@ NextAuth v4 with credentials provider:
 - Configuration: `src/lib/auth.ts`
 - API route: `src/app/api/auth/[...nextauth]/route.ts`
 - Custom sign-in/up pages: `src/app/auth/signin` and `src/app/auth/signup`
-- Password hashing with bcryptjs (12 rounds)
+- Password hashing with bcryptjs (12 rounds) for tenant users
 - JWT session strategy (30-day expiration)
 - SessionProvider wraps app in `src/app/layout.tsx`
 
-User sessions include: `id`, `email`, `name`, `role`, and `tenantId`
+**Authentication Flow:**
+1. Admin login: Checks `ADMIN_EMAIL` and `ADMIN_PASSWORD` from env (no DB query)
+2. Tenant user login: Queries database for user credentials, validates against bcrypt hash
+
+User sessions include: `id`, `email`, `name`, `role` (`'admin'` or `'user'`), and `tenantId` (optional, only for tenant users)
 
 ### AI Integration
 
@@ -102,7 +113,11 @@ MONGODB_URI=mongodb://localhost:27017/multi_tenant_chatbot
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<generate with: openssl rand -base64 32>
 GEMINI_API_KEY=<your-gemini-api-key>
+ADMIN_EMAIL=<admin-email-address>
+ADMIN_PASSWORD=<admin-password>
 ```
+
+**Note**: Admin credentials are stored in environment variables and do not require database access. The admin role is separate from tenant users.
 
 ### Key Technical Decisions
 
@@ -110,33 +125,56 @@ GEMINI_API_KEY=<your-gemini-api-key>
 2. **Turbopack**: Enabled for faster builds (`--turbopack` flag)
 3. **Memory allocation**: Dev server runs with `--max-old-space-size=2048`
 4. **Streaming responses**: Chat API uses ReadableStream for real-time AI responses
-5. **Session isolation**: Chat history uses `tenantId + sessionId` composite key
+5. **User isolation**: Chat history uses `userId + sessionId` composite key for complete user-level isolation
 6. **Theme customization**: Inline styles with tenant colors, falls back to defaults
+7. **Domain-based whitelabeling**: Each tenant has a unique domain for verification and customization
+8. **Base64 logo storage**: Tenant logos are stored as base64-encoded strings in the database for simplified management
 
 ### Adding New Tenants
 
 Tenants can be created via:
-1. Admin UI (if implemented at `/admin/register`)
+1. Admin UI at `/admin` (admin credentials required)
 2. API: `POST /api/tenants` with body:
    ```json
    {
      "tenantId": "unique-id",
      "name": "Company Name",
+     "domain": "example.com",
      "logoUrl": "https://...",
      "themeColor": "#hex",
      "welcomeMessage": "...",
      "aiPersona": "...",
-     "model": "gemini-1.5-flash"
+     "model": "gemini-2.0-flash-exp"
    }
    ```
 
+**Required Fields:**
+- `tenantId`: Unique identifier (lowercase, no spaces)
+- `name`: Company/organization name
+- `domain`: Unique domain for whitelabeling (e.g., "example.com")
+
+**Optional Fields:**
+- `logoUrl`: Company logo as base64-encoded string (uploaded via file input in admin UI)
+- `themeColor`: Primary theme color (hex code)
+- `welcomeMessage`: Custom welcome message for chatbot
+- `aiPersona`: AI assistant personality/instructions
+- `model`: Gemini model to use (default: "gemini-2.0-flash-exp")
+
+**Logo Upload:**
+- Logos are uploaded via file input in the admin dashboard
+- Automatically converted to base64 and stored in the database
+- Max size: 2MB
+- Supported formats: JPG, PNG, GIF
+
 ### Chat Session Flow
 
-1. Client sends message to `/api/chat` with `message`, `tenantId`, `sessionId`
-2. API validates tenant exists, saves user message to ChatHistory
+1. Client sends message to `/api/chat` with `message`, `userId`, `sessionId`, and optionally `tenantId`
+2. API validates tenant exists (if provided), saves user message to ChatHistory (linked to userId)
 3. Gemini streams response using tenant's AI persona and model
 4. Client receives streaming chunks, displays in real-time
-5. Complete response saved to ChatHistory when stream closes
+5. Complete response saved to ChatHistory (linked to userId) when stream closes
+
+**Note**: Chat history is stored per user (not per tenant), ensuring complete user-level data isolation.
 
 ### Type Safety
 

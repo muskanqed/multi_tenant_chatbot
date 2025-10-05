@@ -10,9 +10,9 @@ export async function POST(req: NextRequest) {
   try {
     const { message, tenantId, sessionId, userId } = await req.json();
 
-    if (!message || !sessionId) {
+    if (!message || !sessionId || !userId) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields (message, sessionId, userId)" },
         { status: 400 }
       );
     }
@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
     // Default AI configuration if no tenant
     let aiPersona = "You are a helpful AI assistant.";
     let modelName = "gemini-2.5-pro";
-    const effectiveTenantId = tenantId || "default";
 
     // Get tenant config if tenantId provided
     if (tenantId) {
@@ -31,9 +30,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save user message (optional - only if chat history is needed)
+    // Save user message
     try {
-      await saveChatMessage(effectiveTenantId, sessionId, "user", message, userId);
+      await saveChatMessage(userId, sessionId, "user", message);
     } catch (error) {
       console.warn("Failed to save user message:", error);
     }
@@ -103,15 +102,14 @@ export async function POST(req: NextRequest) {
             console.warn("Failed to get token usage:", error);
           }
 
-          // Save complete assistant response only if not aborted (optional)
+          // Save complete assistant response only if not aborted
           if (!req.signal.aborted && fullResponse) {
             try {
               await saveChatMessage(
-                effectiveTenantId,
+                userId,
                 sessionId,
                 "assistant",
                 fullResponse,
-                userId,
                 tokenData || undefined
               );
             } catch (error) {

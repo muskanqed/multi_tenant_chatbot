@@ -75,9 +75,15 @@ function ChatContent() {
   const loadChatHistory = async (sessionIdToLoad: string) => {
     try {
       setIsLoadingHistory(true);
-      const tenantId = session?.user?.tenantId || "default";
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        console.error("No user ID available");
+        return;
+      }
+
       const response = await fetch(
-        `/api/chat/history?tenantId=${tenantId}&sessionId=${sessionIdToLoad}`
+        `/api/chat/history?userId=${userId}&sessionId=${sessionIdToLoad}`
       );
 
       if (response.ok) {

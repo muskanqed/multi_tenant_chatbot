@@ -12,7 +12,7 @@ interface IMessage {
 }
 
 export interface IChatHistory extends Document {
-  tenantId: string;
+  userId: string;
   sessionId: string;
   messages: IMessage[];
   createdAt: Date;
@@ -48,9 +48,10 @@ const MessageSchema = new Schema<IMessage>(
 
 const ChatHistorySchema = new Schema<IChatHistory>(
   {
-    tenantId: {
+    userId: {
       type: String,
       required: true,
+      ref: 'User',
       index: true,
     },
     sessionId: {
@@ -66,7 +67,7 @@ const ChatHistorySchema = new Schema<IChatHistory>(
 );
 
 // Compound index for efficient queries
-ChatHistorySchema.index({ tenantId: 1, sessionId: 1 });
+ChatHistorySchema.index({ userId: 1, sessionId: 1 }, { unique: true });
 
 const ChatHistory: Model<IChatHistory> =
   mongoose.models.ChatHistory ||

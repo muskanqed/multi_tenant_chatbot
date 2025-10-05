@@ -1,28 +1,46 @@
-import { NextAuthOptions } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
-import { connectDB } from './mongoose';
-import User from '@/models/User';
+import { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { connectDB } from "./mongoose";
+import User from "@/models/User";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please provide email and password');
+          throw new Error("Please provide email and password");
         }
 
+        // Check if admin login (no database connection needed)
+        const adminEmail = process.env.ADMIN_EMAIL;
+        const adminPassword = process.env.ADMIN_PASSWORD;
+
+        if (
+          credentials.email === adminEmail &&
+          credentials.password === adminPassword
+        ) {
+          return {
+            id: "admin",
+            email: adminEmail,
+            name: "Admin",
+            role: "admin",
+            tenantId: undefined,
+          };
+        }
+
+        // For tenant users, check database
         await connectDB();
 
         const user = await User.findOne({ email: credentials.email });
 
         if (!user) {
-          throw new Error('No user found with this email');
+          throw new Error("No user found with this email");
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -31,14 +49,14 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
-          throw new Error('Invalid password');
+          throw new Error("Invalid password");
         }
 
         return {
-          id: user._id.toString(),
+          id: user._id,
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: "user",
           tenantId: user.tenantId,
         };
       },
@@ -63,12 +81,12 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: '/auth/signin',
-    signOut: '/auth/signin',
-    error: '/auth/signin',
+    signIn: "/auth/signin",
+    signOut: "/auth/signin",
+    error: "/auth/signin",
   },
   session: {
-    strategy: 'jwt',
+    strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,

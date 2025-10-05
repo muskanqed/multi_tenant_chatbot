@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface ITenant extends Document {
   tenantId: string;
   name: string;
+  domain: string;
   logoUrl: string;
   themeColor: string;
   welcomeMessage: string;
@@ -26,10 +27,24 @@ const TenantSchema = new Schema<ITenant>(
       required: true,
       trim: true,
     },
-    logoUrl: {
+    domain: {
       type: String,
       required: true,
-      default: "https://via.placeholder.com/150",
+      unique: true,
+      trim: true,
+      lowercase: true,
+      // validate: {
+      //   validator: function(v: string) {
+      //     // Allow localhost or proper domain format
+      //     return /^(localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])$/.test(v);
+      //   },
+      //   message: 'Please enter a valid domain (e.g., example.com or localhost)',
+      // },
+    },
+    logoUrl: {
+      type: String,
+      required: false,
+      default: "",
     },
     themeColor: {
       type: String,

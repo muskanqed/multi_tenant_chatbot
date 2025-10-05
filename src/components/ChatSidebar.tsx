@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, FolderKanban, LogOut, Menu, MessageSquare, Plus, Sparkles, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderKanban, LogOut, Menu, MessageSquare, Plus, Shield, Sparkles, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -59,11 +59,14 @@ export default function ChatSidebar({
   const fetchSessions = async () => {
     try {
       setIsLoading(true);
-      const tenantId = session?.user?.tenantId || "default";
       const userId = session?.user?.id;
 
-      const params = new URLSearchParams({ tenantId });
-      if (userId) params.append("userId", userId);
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
+
+      const params = new URLSearchParams({ userId });
 
       const response = await fetch(`/api/chat/sessions?${params.toString()}`);
       if (response.ok) {
@@ -148,6 +151,16 @@ export default function ChatSidebar({
             <Sparkles className="h-4 w-4" />
             Artifacts
           </Button>
+          {session?.user?.role === "admin" && (
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+              onClick={() => router.push("/admin")}
+            >
+              <Shield className="h-4 w-4" />
+              Admin Panel
+            </Button>
+          )}
         </div>
       )}
 

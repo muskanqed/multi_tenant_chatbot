@@ -7,17 +7,17 @@ import { getChatHistory } from "@/lib/chatHistory";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get("tenantId") || "default";
+    const userId = searchParams.get("userId");
     const sessionId = searchParams.get("sessionId");
 
-    if (!sessionId) {
+    if (!sessionId || !userId) {
       return NextResponse.json(
-        { error: "Missing sessionId" },
+        { error: "Missing required fields (userId, sessionId)" },
         { status: 400 }
       );
     }
 
-    const history = await getChatHistory(tenantId, sessionId);
+    const history = await getChatHistory(userId, sessionId);
 
     if (!history) {
       return NextResponse.json({ messages: [] });

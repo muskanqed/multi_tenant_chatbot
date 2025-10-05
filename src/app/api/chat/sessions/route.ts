@@ -7,10 +7,16 @@ import { getUserChatSessions } from "@/lib/chatHistory";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get("tenantId") || "default";
-    const userId = searchParams.get("userId") || undefined;
+    const userId = searchParams.get("userId");
 
-    const sessions = await getUserChatSessions(tenantId, userId);
+    if (!userId) {
+      return NextResponse.json(
+        { error: "userId is required" },
+        { status: 400 }
+      );
+    }
+
+    const sessions = await getUserChatSessions(userId);
 
     return NextResponse.json({ sessions });
   } catch (error) {

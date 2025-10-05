@@ -5,8 +5,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IChatSession extends Document {
   sessionId: string;
-  tenantId: string;
-  userId?: string;
+  userId: string;
   title: string;
   lastMessageAt: Date;
   createdAt: Date;
@@ -20,14 +19,10 @@ const ChatSessionSchema = new Schema<IChatSession>(
       unique: true,
       index: true,
     },
-    tenantId: {
-      type: String,
-      required: true,
-      default: "default",
-      index: true,
-    },
     userId: {
       type: String,
+      required: true,
+      ref: 'User',
       index: true,
     },
     title: {
@@ -47,7 +42,7 @@ const ChatSessionSchema = new Schema<IChatSession>(
 );
 
 // Compound index for efficient querying
-ChatSessionSchema.index({ tenantId: 1, userId: 1, lastMessageAt: -1 });
+ChatSessionSchema.index({ userId: 1, lastMessageAt: -1 });
 
 const ChatSession =
   mongoose.models.ChatSession ||

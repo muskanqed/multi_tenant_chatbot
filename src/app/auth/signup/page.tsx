@@ -17,6 +17,7 @@ export default function SignUpPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    tenantId: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -48,6 +49,7 @@ export default function SignUpPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          tenantId: formData.tenantId,
         }),
       });
 
@@ -115,6 +117,20 @@ export default function SignUpPage() {
                 type="email"
                 placeholder="you@example.com"
                 value={formData.email}
+                onChange={handleChange}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tenantId">Tenant ID</Label>
+              <Input
+                id="tenantId"
+                name="tenantId"
+                type="text"
+                placeholder="your-company-id"
+                value={formData.tenantId}
                 onChange={handleChange}
                 required
                 disabled={loading}
