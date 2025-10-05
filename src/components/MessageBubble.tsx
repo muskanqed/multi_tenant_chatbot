@@ -1,14 +1,20 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { User, Bot } from "lucide-react";
+import { Bot, User } from "lucide-react";
 import CopyButton from "./CopyButton";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  tokens?: {
+    promptTokens: number;
+    responseTokens: number;
+    totalTokens: number;
+  };
 }
 
 interface MessageBubbleProps {
@@ -26,7 +32,7 @@ export default function MessageBubble({ message, theme }: MessageBubbleProps) {
     <div
       className={cn(
         "flex gap-3 max-w-[80%]",
-        isUser ? "ml-auto flex-row-reverse" : "mr-auto"
+        isUser ? "ml-auto flex-row-reverse w-fit" : "mr-auto"
       )}
     >
       <div
@@ -51,7 +57,13 @@ export default function MessageBubble({ message, theme }: MessageBubbleProps) {
           )}
           style={isUser && theme?.primaryColor ? { backgroundColor: theme.primaryColor, color: "white" } : {}}
         >
-          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+          ) : (
+            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+              <MarkdownRenderer content={message.content} />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 px-2">
@@ -59,8 +71,20 @@ export default function MessageBubble({ message, theme }: MessageBubbleProps) {
             {message.timestamp.toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
+              hour12: true,
             })}
           </span>
+          {message.role === "assistant" && message.tokens && (
+            <>
+              <span className="text-xs text-muted-foreground">•</span>
+              <span
+                className="text-xs text-muted-foreground"
+                title={`Prompt: ${message.tokens.promptTokens} | Response: ${message.tokens.responseTokens}`}
+              >
+                {message.tokens.totalTokens.toLocaleString()} tokens
+              </span>
+            </>
+          )}
           {!isUser && <CopyButton text={message.content} />}
         </div>
       </div>

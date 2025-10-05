@@ -17,7 +17,7 @@ export async function streamGeminiResponse(
 
   const result = await model.generateContentStream(prompt);
 
-  return result.stream;
+  return result;
 }
 
 export async function getGeminiResponse(

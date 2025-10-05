@@ -4,6 +4,11 @@ interface IMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  tokens?: {
+    promptTokens: number;
+    responseTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface IChatHistory extends Document {
@@ -28,6 +33,14 @@ const MessageSchema = new Schema<IMessage>(
     timestamp: {
       type: Date,
       default: Date.now,
+    },
+    tokens: {
+      type: {
+        promptTokens: { type: Number, required: false },
+        responseTokens: { type: Number, required: false },
+        totalTokens: { type: Number, required: false },
+      },
+      required: false,
     },
   },
   { _id: false }

@@ -10,19 +10,31 @@ export async function saveChatMessage(
   sessionId: string,
   role: 'user' | 'assistant',
   content: string,
-  userId?: string
+  userId?: string,
+  tokens?: {
+    promptTokens: number;
+    responseTokens: number;
+    totalTokens: number;
+  }
 ) {
   await connectDB();
+
+  const messageData: any = {
+    role,
+    content,
+    timestamp: new Date(),
+  };
+
+  // Add tokens only if provided
+  if (tokens) {
+    messageData.tokens = tokens;
+  }
 
   const chat = await ChatHistory.findOneAndUpdate(
     { tenantId, sessionId },
     {
       $push: {
-        messages: {
-          role,
-          content,
-          timestamp: new Date(),
-        },
+        messages: messageData,
       },
     },
     { upsert: true, new: true }

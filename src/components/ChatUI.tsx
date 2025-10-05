@@ -28,6 +28,7 @@ export default function ChatUI({ tenantId, theme }: ChatUIProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,8 +38,35 @@ export default function ChatUI({ tenantId, theme }: ChatUIProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Cancel ongoing requests on unmount or page navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Cancel any ongoing request when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    // Abort any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -56,6 +84,7 @@ export default function ChatUI({ tenantId, theme }: ChatUIProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input }),
+        signal: abortControllerRef.current.signal,
       });
 
       const data = await response.json();
@@ -69,9 +98,14 @@ export default function ChatUI({ tenantId, theme }: ChatUIProps) {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      console.error("Error sending message:", error);
+      if (error instanceof Error && error.name === "AbortError") {
+        console.log("Request cancelled");
+      } else {
+        console.error("Error sending message:", error);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 

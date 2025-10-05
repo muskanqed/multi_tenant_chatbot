@@ -39,38 +39,102 @@ export async function POST(req: NextRequest) {
     }
 
     // Stream response from Gemini
-    const stream = await streamGeminiResponse(message, aiPersona, modelName);
+    const result = await streamGeminiResponse(message, aiPersona, modelName);
 
-    // Create a readable stream
+    // Create a readable stream with abort handling
     const encoder = new TextEncoder();
     let fullResponse = "";
 
     const readableStream = new ReadableStream({
       async start(controller) {
+        let isClosed = false;
+
+        // Handle client disconnect/abort
+        const abortHandler = () => {
+          console.log("Client disconnected - aborting stream");
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.close();
+            } catch (e) {
+              // Controller already closed, ignore
+            }
+          }
+        };
+
+        req.signal.addEventListener("abort", abortHandler);
+
         try {
-          for await (const chunk of stream) {
+          for await (const chunk of result.stream) {
+            // Check if client has disconnected
+            if (req.signal.aborted) {
+              console.log("Request aborted, stopping generation");
+              break;
+            }
+
             const text = chunk.text();
             fullResponse += text;
-            controller.enqueue(encoder.encode(text));
+
+            if (!isClosed) {
+              controller.enqueue(encoder.encode(text));
+            }
           }
 
-          // Save complete assistant response (optional)
+          // Get token usage after stream completes
+          let tokenData = null;
           try {
-            await saveChatMessage(
-              effectiveTenantId,
-              sessionId,
-              "assistant",
-              fullResponse,
-              userId
-            );
+            const response = await result.response;
+            const usageMetadata = response.usageMetadata;
+            if (usageMetadata) {
+              tokenData = {
+                promptTokens: usageMetadata.promptTokenCount || 0,
+                responseTokens: usageMetadata.candidatesTokenCount || 0,
+                totalTokens: usageMetadata.totalTokenCount || 0,
+              };
+
+              // Send token data as special marker at the end
+              if (!isClosed) {
+                controller.enqueue(
+                  encoder.encode(`\n__TOKEN_USAGE__${JSON.stringify(tokenData)}`)
+                );
+              }
+            }
           } catch (error) {
-            console.warn("Failed to save assistant message:", error);
+            console.warn("Failed to get token usage:", error);
           }
 
-          controller.close();
+          // Save complete assistant response only if not aborted (optional)
+          if (!req.signal.aborted && fullResponse) {
+            try {
+              await saveChatMessage(
+                effectiveTenantId,
+                sessionId,
+                "assistant",
+                fullResponse,
+                userId,
+                tokenData || undefined
+              );
+            } catch (error) {
+              console.warn("Failed to save assistant message:", error);
+            }
+          }
+
+          if (!isClosed) {
+            isClosed = true;
+            controller.close();
+          }
         } catch (error) {
           console.error("Stream error:", error);
-          controller.error(error);
+          if (!isClosed) {
+            isClosed = true;
+            try {
+              controller.error(error);
+            } catch (e) {
+              // Controller already closed, ignore
+            }
+          }
+        } finally {
+          req.signal.removeEventListener("abort", abortHandler);
         }
       },
     });

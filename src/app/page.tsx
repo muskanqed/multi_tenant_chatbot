@@ -5,10 +5,23 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, Sparkles } from "lucide-react";
+import ChatSidebar from "@/components/ChatSidebar";
+
+// Simple UUID generator function
+function generateSessionId() {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+}
 
 export default function Home() {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
+  const [currentSessionId] = useState(() => generateSessionId());
+
+  const handleNewChat = () => {
+    const newSessionId = generateSessionId();
+    setPrompt("");
+    router.push("/chat");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +47,13 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-muted/20">
-      <div className="w-full max-w-3xl space-y-8">
+    <div className="flex h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Sidebar */}
+      <ChatSidebar currentSessionId={currentSessionId} onNewChat={handleNewChat} />
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-3xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
@@ -96,9 +114,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Footer Info */}
-        <div className="text-center text-xs text-muted-foreground">
-          <p>Powered by Google Gemini AI • Multi-tenant architecture</p>
+          {/* Footer Info */}
+          <div className="text-center text-xs text-muted-foreground">
+            <p>Powered by Google Gemini AI • Multi-tenant architecture</p>
+          </div>
         </div>
       </div>
     </div>
