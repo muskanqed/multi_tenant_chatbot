@@ -10,8 +10,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { Send, User, Bot, ArrowLeft, Sparkles } from "lucide-react";
+import { Send, User, Bot, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import ChatSidebar from "@/components/ChatSidebar";
 
 // Simple UUID generator function
 function generateSessionId() {
@@ -32,7 +33,8 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(() => generateSessionId());
+  const [sessionId, setSessionId] = useState(() => generateSessionId());
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,17 +47,58 @@ function ChatContent() {
     scrollToBottom();
   }, [messages]);
 
-  // Handle initial prompt from URL
+  // Load conversation history or handle initial prompt
   useEffect(() => {
+    const urlSessionId = searchParams.get("sessionId");
     const initialPrompt = searchParams.get("prompt");
-    if (initialPrompt && messages.length === 0) {
+
+    if (urlSessionId) {
+      // Load existing conversation
+      setSessionId(urlSessionId);
+      loadChatHistory(urlSessionId);
+    } else if (initialPrompt && messages.length === 0) {
+      // Auto-submit initial prompt for new chat
       setInput(decodeURIComponent(initialPrompt));
-      // Auto-submit the initial prompt
       setTimeout(() => {
         handleSend(decodeURIComponent(initialPrompt));
       }, 100);
     }
   }, [searchParams]);
+
+  const loadChatHistory = async (sessionIdToLoad: string) => {
+    try {
+      setIsLoadingHistory(true);
+      const tenantId = session?.user?.tenantId || "default";
+      const response = await fetch(
+        `/api/chat/history?tenantId=${tenantId}&sessionId=${sessionIdToLoad}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const historyMessages: Message[] = data.messages.map(
+          (msg: any, index: number) => ({
+            id: `${Date.now()}-${index}`,
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp),
+          })
+        );
+        setMessages(historyMessages);
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    const newSessionId = generateSessionId();
+    setSessionId(newSessionId);
+    setMessages([]);
+    setInput("");
+    router.push("/chat");
+  };
 
   const handleSend = async (messageText?: string) => {
     const textToSend = messageText || input;
@@ -75,6 +118,7 @@ function ChatContent() {
     try {
       // Use a default tenant for now - you can make this dynamic later
       const tenantId = session?.user?.tenantId || "default";
+      const userId = session?.user?.id;
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -83,6 +127,7 @@ function ChatContent() {
           message: textToSend,
           tenantId,
           sessionId,
+          userId,
         }),
       });
 
@@ -151,44 +196,45 @@ function ChatContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-background to-muted/20">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <div className="container flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/")}
-              className="rounded-full"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <h1 className="text-lg font-semibold">AI Assistant</h1>
+    <div className="flex h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Sidebar */}
+      <ChatSidebar currentSessionId={sessionId} onNewChat={handleNewChat} />
+
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Header */}
+        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+          <div className="container flex items-center justify-between h-16 px-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h1 className="text-lg font-semibold">AI Assistant</h1>
+              </div>
             </div>
+
+            {session?.user && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                  {session.user.name}
+                </span>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>
+                    {session.user.name?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            )}
           </div>
+        </header>
 
-          {session?.user && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {session.user.name}
-              </span>
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>
-                  {session.user.name?.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 px-4">
-        <div className="container max-w-4xl mx-auto py-6 space-y-6">
-          {messages.length === 0 && !isLoading && (
+        {/* Messages Area */}
+        <ScrollArea className="flex-1 px-4">
+          <div className="container max-w-4xl mx-auto py-6 space-y-6">
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center h-full py-20">
+                <LoadingSpinner size="lg" text="Loading conversation..." />
+              </div>
+            ) : messages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-20">
               <Sparkles className="h-12 w-12 text-primary/50" />
               <div>
@@ -264,12 +310,12 @@ function ChatContent() {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
 
-      {/* Input Area */}
-      <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky bottom-0">
+        {/* Input Area */}
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky bottom-0">
         <div className="container max-w-4xl mx-auto p-4">
           <form
             onSubmit={(e) => {
@@ -299,6 +345,7 @@ function ChatContent() {
           <p className="text-xs text-center text-muted-foreground mt-2">
             AI can make mistakes. Check important info.
           </p>
+        </div>
         </div>
       </div>
     </div>

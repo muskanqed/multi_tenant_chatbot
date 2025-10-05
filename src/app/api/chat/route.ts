@@ -8,7 +8,7 @@ import { getTenantConfig } from "@/lib/tenantConfig";
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, tenantId, sessionId } = await req.json();
+    const { message, tenantId, sessionId, userId } = await req.json();
 
     if (!message || !sessionId) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Save user message (optional - only if chat history is needed)
     try {
-      await saveChatMessage(effectiveTenantId, sessionId, "user", message);
+      await saveChatMessage(effectiveTenantId, sessionId, "user", message, userId);
     } catch (error) {
       console.warn("Failed to save user message:", error);
     }
@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
               effectiveTenantId,
               sessionId,
               "assistant",
-              fullResponse
+              fullResponse,
+              userId
             );
           } catch (error) {
             console.warn("Failed to save assistant message:", error);
