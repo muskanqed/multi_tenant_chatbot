@@ -34,7 +34,14 @@ export async function PUT(
 ) {
   try {
     const body = await req.json();
-    const tenant = await updateTenant(params.tenantId, body);
+
+    // Remove immutable fields to prevent update conflicts
+    const { tenantId, _id, createdAt, updatedAt, ...updateData } = body;
+
+    console.log('Updating tenant:', params.tenantId);
+    console.log('Update data:', updateData);
+
+    const tenant = await updateTenant(params.tenantId, updateData);
 
     if (!tenant) {
       return NextResponse.json(
@@ -44,10 +51,19 @@ export async function PUT(
     }
 
     return NextResponse.json(tenant);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating tenant:', error);
+
+    // Handle duplicate domain error
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { error: 'A tenant with this domain already exists' },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to update tenant' },
+      { error: error.message || 'Failed to update tenant' },
       { status: 500 }
     );
   }
