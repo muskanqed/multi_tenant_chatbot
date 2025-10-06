@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, FolderKanban, LogOut, Menu, MessageSquare, Plus, Shield, Sparkles, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, Menu, MessageSquare, Plus, Shield, Sparkles, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -110,7 +110,7 @@ export default function ChatSidebar({
         {collapsed ? (
           <Button
             onClick={handleNewChat}
-            className="w-full bg-orange-600 hover:bg-orange-700"
+            className="w-full"
             size="icon"
             title="New Chat"
           >
@@ -119,7 +119,7 @@ export default function ChatSidebar({
         ) : (
           <Button
             onClick={handleNewChat}
-            className="w-full gap-2 bg-orange-600 hover:bg-orange-700"
+            className="w-full gap-2"
           >
             <Plus className="h-4 w-4" />
             New chat
@@ -127,40 +127,17 @@ export default function ChatSidebar({
         )}
       </div>
 
-      {/* Navigation Items */}
-      {!collapsed && (
-        <div className="px-3 py-3 space-y-1">
+      {/* Admin Panel Button */}
+      {!collapsed && session?.user?.role === "admin" && (
+        <div className="px-3 py-3">
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+            onClick={() => router.push("/admin")}
           >
-            <MessageSquare className="h-4 w-4" />
-            Chats
+            <Shield className="h-4 w-4" />
+            Admin Panel
           </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-          >
-            <FolderKanban className="h-4 w-4" />
-            Projects
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-          >
-            <Sparkles className="h-4 w-4" />
-            Artifacts
-          </Button>
-          {session?.user?.role === "admin" && (
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-              onClick={() => router.push("/admin")}
-            >
-              <Shield className="h-4 w-4" />
-              Admin Panel
-            </Button>
-          )}
         </div>
       )}
 
