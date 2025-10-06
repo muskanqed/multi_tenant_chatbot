@@ -13,7 +13,7 @@ This is a **multi-tenant AI chatbot** built with Next.js 15, MongoDB (Mongoose),
 npm run dev              # Start dev server with increased memory allocation
 
 # Build & Deploy
-npm run build           # Production build with Turbopack
+npm run build           # Production build (webpack for Vercel compatibility)
 npm start              # Start production server
 
 # Code Quality
@@ -122,7 +122,7 @@ ADMIN_PASSWORD=<admin-password>
 ### Key Technical Decisions
 
 1. **Biome over ESLint/Prettier**: Using Biome for linting and formatting
-2. **Turbopack**: Enabled for faster builds (`--turbopack` flag)
+2. **Turbopack**: Only enabled for development (production builds use webpack to avoid lightningcss native module issues on Vercel)
 3. **Memory allocation**: Dev server runs with `--max-old-space-size=2048`
 4. **Streaming responses**: Chat API uses ReadableStream for real-time AI responses
 5. **User isolation**: Chat history uses `userId + sessionId` composite key for complete user-level isolation
