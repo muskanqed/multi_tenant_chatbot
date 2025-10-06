@@ -88,9 +88,9 @@ export async function POST(req: NextRequest) {
 
       // Build context: summary as system context + recent messages
       if (currentSummary) {
-        // Add summary as first "assistant" message to provide context
+        // Add summary as first "user" message to provide context (Gemini requires first message to be 'user')
         conversationHistory.push({
-          role: "assistant",
+          role: "user",
           content: `[Previous conversation summary: ${currentSummary}]`,
         });
       }
