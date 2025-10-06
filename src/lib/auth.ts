@@ -79,6 +79,16 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      // If the URL is relative, use it as-is (preserves current domain)
+      if (url.startsWith("/")) return url;
+
+      // If URL is on the same origin, allow it
+      if (new URL(url).origin === baseUrl) return url;
+
+      // Otherwise, redirect to home page on current domain
+      return "/";
+    },
   },
   pages: {
     signIn: "/auth/signin",

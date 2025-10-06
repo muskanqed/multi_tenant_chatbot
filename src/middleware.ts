@@ -8,14 +8,23 @@ export default withAuth(
 
     // Protect admin routes - only allow admin role
     if (isAdminRoute && token?.role !== "admin") {
-      return NextResponse.redirect(new URL("/auth/signin", req.url));
+      // Preserve the current domain in redirect
+      const signInUrl = new URL("/auth/signin", req.url);
+      signInUrl.searchParams.set("callbackUrl", req.url);
+      return NextResponse.redirect(signInUrl);
     }
 
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        // Allow unauthenticated access to auth pages
+        if (req.nextUrl.pathname.startsWith("/auth/")) {
+          return true;
+        }
+        return !!token;
+      },
     },
   }
 );

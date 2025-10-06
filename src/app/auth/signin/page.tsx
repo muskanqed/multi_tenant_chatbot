@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LogIn } from "lucide-react";
+import { Loader2, LogIn, Sparkles } from "lucide-react";
+import { useTenantBranding } from "@/hooks/useTenantBranding";
 
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const { branding, loading: brandingLoading, error: brandingError } = useTenantBranding();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -54,16 +56,63 @@ export default function SignInPage() {
     }));
   };
 
+  // Show error state if tenant not found
+  if (brandingError && !brandingLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center text-destructive">
+              Configuration Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertDescription>{brandingError}</AlertDescription>
+            </Alert>
+            <p className="mt-4 text-sm text-center text-muted-foreground">
+              Please ensure you're accessing the correct domain or contact your administrator.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Welcome Back
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account to continue
-          </CardDescription>
+        <CardHeader className="space-y-4">
+          {/* Tenant Logo */}
+          <div className="flex justify-center">
+            {brandingLoading ? (
+              <div className="h-16 w-16 rounded-lg bg-muted animate-pulse" />
+            ) : branding?.logoUrl ? (
+              <div className="relative h-16 w-auto max-w-[200px] flex items-center justify-center">
+                <img
+                  src={branding.logoUrl}
+                  alt={`${branding.name} logo`}
+                  className="max-h-16 max-w-[200px] object-contain"
+                />
+              </div>
+            ) : branding?.themeColor ? (
+              <div
+                className="h-16 w-16 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: branding.themeColor }}
+              >
+                <Sparkles className="h-8 w-8 text-white" />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              Welcome Back
+            </CardTitle>
+            <CardDescription className="text-center">
+              Sign in to {branding?.name || "your account"} to continue
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

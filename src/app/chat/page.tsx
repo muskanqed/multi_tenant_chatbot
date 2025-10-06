@@ -11,6 +11,8 @@ import { ArrowLeft, Bot, Send, Sparkles, Square } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { useTenantBranding } from "@/hooks/useTenantBranding";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Simple UUID generator function
 function generateSessionId() {
@@ -33,6 +35,7 @@ function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
+  const { branding, loading: brandingLoading, error: brandingError } = useTenantBranding();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -139,9 +142,13 @@ function ChatContent() {
     setIsLoading(true);
 
     try {
-      // Use a default tenant for now - you can make this dynamic later
-      const tenantId = session?.user?.tenantId || "default";
+      // Use tenant ID from branding (domain-based detection)
+      const tenantId = branding?.tenantId || session?.user?.tenantId;
       const userId = session?.user?.id;
+
+      if (!tenantId) {
+        throw new Error("Unable to determine tenant. Please ensure you're accessing the correct domain.");
+      }
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -260,6 +267,27 @@ function ChatContent() {
     }
   };
 
+  // Show error state if tenant not found
+  if (brandingError && !brandingLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <Card className="w-full max-w-md">
+          <div className="p-6">
+            <h2 className="text-2xl font-bold text-center text-destructive mb-4">
+              Configuration Error
+            </h2>
+            <Alert variant="destructive">
+              <AlertDescription>{brandingError}</AlertDescription>
+            </Alert>
+            <p className="mt-4 text-sm text-center text-muted-foreground">
+              Please ensure you're accessing the correct domain or contact your administrator.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Main Chat Area */}
@@ -277,8 +305,20 @@ function ChatContent() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h1 className="text-lg font-semibold">AI Assistant</h1>
+                {brandingLoading ? (
+                  <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+                ) : branding?.logoUrl ? (
+                  <img
+                    src={branding.logoUrl}
+                    alt={`${branding.name} logo`}
+                    className="h-8 w-auto max-w-[120px] object-contain"
+                  />
+                ) : (
+                  <Sparkles className="h-5 w-5 text-primary" />
+                )}
+                <h1 className="text-lg font-semibold">
+                  {brandingLoading ? "Loading..." : branding?.name || "AI Assistant"}
+                </h1>
               </div>
             </div>
 

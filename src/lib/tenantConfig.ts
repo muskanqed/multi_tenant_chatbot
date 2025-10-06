@@ -15,6 +15,24 @@ export async function getTenantConfig(tenantId: string): Promise<ITenant | null>
   }
 }
 
+export async function getTenantByDomain(domain: string): Promise<ITenant | null> {
+  try {
+    await connectDB();
+    // Normalize domain (remove www., protocol, trailing slash, port)
+    const normalizedDomain = domain
+      .toLowerCase()
+      .replace(/^(https?:\/\/)?(www\.)?/, '')
+      .replace(/:\d+$/, '') // Remove port
+      .replace(/\/$/, ''); // Remove trailing slash
+
+    const tenant = await Tenant.findOne({ domain: normalizedDomain }).lean();
+    return tenant as ITenant | null;
+  } catch (error) {
+    console.error('Error fetching tenant by domain:', error);
+    return null;
+  }
+}
+
 export async function getAllTenants(): Promise<ITenant[]> {
   try {
     await connectDB();

@@ -8,6 +8,11 @@ export async function POST(req: NextRequest) {
   try {
     const { name, email, password, tenantId } = await req.json();
 
+    console.log('=== Signup Request Debug ===');
+    console.log('Received tenantId:', tenantId);
+    console.log('tenantId type:', typeof tenantId);
+    console.log('tenantId value:', JSON.stringify(tenantId));
+
     // Validation
     if (!name || !email || !password || !tenantId) {
       return NextResponse.json(
@@ -26,10 +31,17 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     // Verify tenant exists
+    console.log('Searching for tenant with tenantId:', tenantId);
     const tenant = await Tenant.findOne({ tenantId });
+    console.log('Found tenant:', tenant ? 'YES' : 'NO');
+
     if (!tenant) {
+      // List all tenants for debugging
+      const allTenants = await Tenant.find({}).select('tenantId name domain');
+      console.log('All tenants in database:', allTenants);
+
       return NextResponse.json(
-        { error: 'Invalid tenant ID' },
+        { error: `Invalid tenant ID: "${tenantId}". Please ensure you're accessing the correct domain.` },
         { status: 404 }
       );
     }

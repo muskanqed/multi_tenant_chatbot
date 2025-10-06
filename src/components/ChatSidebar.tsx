@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, LogOut, Menu, MessageSquare, Plus, Shield, S
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTenantBranding } from "@/hooks/useTenantBranding";
 
 interface ChatSession {
   _id: string;
@@ -32,6 +33,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const { branding } = useTenantBranding();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -95,12 +97,30 @@ export default function ChatSidebar({
       <div className={cn("p-4 border-b", collapsed && "p-2")}>
         {collapsed ? (
           <div className="flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-primary" />
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={`${branding.name} logo`}
+                className="h-8 w-8 object-contain"
+              />
+            ) : (
+              <Sparkles className="h-5 w-5 text-primary" />
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">Claude</h1>
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={`${branding.name} logo`}
+                className="h-8 w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <Sparkles className="h-5 w-5 text-primary" />
+            )}
+            <h1 className="text-lg font-semibold truncate">
+              {branding?.name || "AI Assistant"}
+            </h1>
           </div>
         )}
       </div>
