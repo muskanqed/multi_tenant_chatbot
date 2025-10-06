@@ -15,6 +15,8 @@ export interface IChatHistory extends Document {
   userId: string;
   sessionId: string;
   messages: IMessage[];
+  summary?: string; // Summary of older messages beyond the sliding window
+  summarizedUpToIndex?: number; // Index up to which messages have been summarized
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +62,15 @@ const ChatHistorySchema = new Schema<IChatHistory>(
       index: true,
     },
     messages: [MessageSchema],
+    summary: {
+      type: String,
+      required: false,
+    },
+    summarizedUpToIndex: {
+      type: Number,
+      required: false,
+      default: -1,
+    },
   },
   {
     timestamps: true,

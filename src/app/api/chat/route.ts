@@ -2,9 +2,15 @@
 // app/api/chat/route.ts - Chat Endpoint with Streaming
 // ============================================
 import { NextRequest, NextResponse } from "next/server";
-import { streamGeminiResponse } from "@/lib/gemini";
-import { saveChatMessage } from "@/lib/chatHistory";
+import { streamGeminiResponse, summarizeConversation } from "@/lib/gemini";
+import { saveChatMessage, getChatHistory } from "@/lib/chatHistory";
 import { getTenantConfig } from "@/lib/tenantConfig";
+import ChatHistory from "@/models/ChatHistory";
+import { connectDB } from "@/lib/mongoose";
+
+// Sliding window configuration
+const SLIDING_WINDOW_SIZE = 8; // Keep last 15 messages in full context
+const SUMMARIZE_THRESHOLD = 15; // Start summarizing when conversation exceeds 20 messages
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,8 +43,70 @@ export async function POST(req: NextRequest) {
       console.warn("Failed to save user message:", error);
     }
 
-    // Stream response from Gemini
-    const result = await streamGeminiResponse(message, aiPersona, modelName);
+    // Get conversation history for context
+    const chatHistory = await getChatHistory(userId, sessionId);
+    const allMessages =
+      chatHistory?.messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })) || [];
+
+    let conversationHistory: Array<{
+      role: "user" | "assistant";
+      content: string;
+    }> = [];
+    let currentSummary = chatHistory?.summary;
+    let shouldUpdateSummary = false;
+
+    // Implement sliding window with summarization
+    if (allMessages.length > SUMMARIZE_THRESHOLD) {
+      const messagesToKeep = allMessages.slice(-SLIDING_WINDOW_SIZE);
+      const messagesToSummarize = allMessages.slice(0, -SLIDING_WINDOW_SIZE);
+
+      const lastSummarizedIndex = chatHistory?.summarizedUpToIndex ?? -1;
+      const newMessagesToSummarize = messagesToSummarize.slice(
+        lastSummarizedIndex + 1
+      );
+
+      // Only create/update summary if there are new messages to summarize
+      if (newMessagesToSummarize.length > 0) {
+        try {
+          console.log(
+            `Summarizing ${
+              newMessagesToSummarize.length
+            } messages (existing summary: ${!!currentSummary})`
+          );
+          currentSummary = await summarizeConversation(
+            newMessagesToSummarize,
+            currentSummary
+          );
+          shouldUpdateSummary = true;
+        } catch (error) {
+          console.warn("Failed to create summary:", error);
+        }
+      }
+
+      // Build context: summary as system context + recent messages
+      if (currentSummary) {
+        // Add summary as first "assistant" message to provide context
+        conversationHistory.push({
+          role: "assistant",
+          content: `[Previous conversation summary: ${currentSummary}]`,
+        });
+      }
+      conversationHistory.push(...messagesToKeep);
+    } else {
+      // Use all messages if under threshold
+      conversationHistory = allMessages;
+    }
+
+    // Stream response from Gemini with conversation history
+    const result = await streamGeminiResponse(
+      message,
+      aiPersona,
+      modelName,
+      conversationHistory
+    );
 
     // Create a readable stream with abort handling
     const encoder = new TextEncoder();
@@ -94,7 +162,9 @@ export async function POST(req: NextRequest) {
               // Send token data as special marker at the end
               if (!isClosed) {
                 controller.enqueue(
-                  encoder.encode(`\n__TOKEN_USAGE__${JSON.stringify(tokenData)}`)
+                  encoder.encode(
+                    `\n__TOKEN_USAGE__${JSON.stringify(tokenData)}`
+                  )
                 );
               }
             }
@@ -112,6 +182,25 @@ export async function POST(req: NextRequest) {
                 fullResponse,
                 tokenData || undefined
               );
+
+              // Save updated summary if it was generated
+              if (shouldUpdateSummary && currentSummary) {
+                await connectDB();
+                const totalMessages = allMessages.length + 1; // +1 for the new assistant message
+                const newSummarizedIndex =
+                  totalMessages - SLIDING_WINDOW_SIZE - 1;
+
+                await ChatHistory.findOneAndUpdate(
+                  { userId, sessionId },
+                  {
+                    summary: currentSummary,
+                    summarizedUpToIndex: newSummarizedIndex,
+                  }
+                );
+                console.log(
+                  `Summary saved. Summarized up to index: ${newSummarizedIndex}`
+                );
+              }
             } catch (error) {
               console.warn("Failed to save assistant message:", error);
             }
